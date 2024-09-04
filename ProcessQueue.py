@@ -171,3 +171,160 @@ if __name__ == "__main__":
 
     # Ejecución de Prioridad
     pq.execute_priority()
+import matplotlib.pyplot as plt
+from collections import deque
+from process import Process
+
+class ProcessQueue:
+    def __init__(self):
+        self.queue = deque()
+        self.current_time = 0
+
+    def add_process(self, process):
+        self.queue.append(process)
+
+    def remove_process(self):
+        if len(self.queue) > 0:
+            return self.queue.popleft()
+        else:
+            return None
+
+    def calculate_metrics(self, process):
+        turnaround_time = process.finish_time - process.arrival_time
+        waiting_time = turnaround_time - process.burst_time
+        return turnaround_time, waiting_time
+
+    def execute_fifo(self):
+        print("\nEjecutando FIFO:")
+        total_turnaround = 0
+        total_waiting = 0
+        count = 0
+        while self.queue:
+            process = self.remove_process()
+            if process.start_time is None:
+                process.start_time = self.current_time
+            self.current_time += process.burst_time
+            process.finish_time = self.current_time
+            turnaround, waiting = self.calculate_metrics(process)
+            total_turnaround += turnaround
+            total_waiting += waiting
+            count += 1
+        return total_turnaround / count, total_waiting / count if count > 0 else (0, 0)
+
+    def execute_sjf(self):
+        print("\nEjecutando SJF:")
+        self.queue = deque(sorted(self.queue, key=lambda p: p.burst_time))
+        total_turnaround = 0
+        total_waiting = 0
+        count = 0
+        while self.queue:
+            process = self.remove_process()
+            if process.start_time is None:
+                process.start_time = self.current_time
+            self.current_time += process.burst_time
+            process.finish_time = self.current_time
+            turnaround, waiting = self.calculate_metrics(process)
+            total_turnaround += turnaround
+            total_waiting += waiting
+            count += 1
+        return total_turnaround / count, total_waiting / count if count > 0 else (0, 0)
+
+    def execute_rr(self, time_quantum):
+        print("\nEjecutando Round Robin:")
+        total_turnaround = 0
+        total_waiting = 0
+        count = 0
+        while self.queue:
+            process = self.remove_process()
+            if process.start_time is None:
+                process.start_time = self.current_time
+            if process.burst_time > time_quantum:
+                process.burst_time -= time_quantum
+                self.current_time += time_quantum
+                self.add_process(process)
+            else:
+                self.current_time += process.burst_time
+                process.finish_time = self.current_time
+                turnaround, waiting = self.calculate_metrics(process)
+                total_turnaround += turnaround
+                total_waiting += waiting
+                count += 1
+        return total_turnaround / count, total_waiting / count if count > 0 else (0, 0)
+
+    def execute_priority(self):
+        print("\nEjecutando Prioridad:")
+        self.queue = deque(sorted(self.queue, key=lambda p: p.priority, reverse=True))
+        total_turnaround = 0
+        total_waiting = 0
+        count = 0
+        while self.queue:
+            process = self.remove_process()
+            if process.start_time is None:
+                process.start_time = self.current_time
+            self.current_time += process.burst_time
+            process.finish_time = self.current_time
+            turnaround, waiting = self.calculate_metrics(process)
+            total_turnaround += turnaround
+            total_waiting += waiting
+            count += 1
+        return total_turnaround / count, total_waiting / count if count > 0 else (0, 0)
+
+
+if __name__ == "__main__":
+    pq = ProcessQueue()
+
+    # Añadir procesos para FIFO
+    p1 = Process(id=1, arrival_time=0, burst_time=5)
+    p2 = Process(id=2, arrival_time=1, burst_time=3)
+    
+    pq.add_process(p1)
+    pq.add_process(p2)
+    avg_turnaround_fifo, avg_waiting_fifo = pq.execute_fifo()
+
+    # Añadir procesos para SJF
+    p3 = Process(id=3, arrival_time=0, burst_time=4)
+    p4 = Process(id=4, arrival_time=1, burst_time=2)
+
+    pq.add_process(p3)
+    pq.add_process(p4)
+    avg_turnaround_sjf, avg_waiting_sjf = pq.execute_sjf()
+
+    # Añadir procesos para Round Robin
+    p5 = Process(id=5, arrival_time=0, burst_time=6)
+    p6 = Process(id=6, arrival_time=1, burst_time=4)
+
+    pq.add_process(p5)
+    pq.add_process(p6)
+    avg_turnaround_rr, avg_waiting_rr = pq.execute_rr(time_quantum=2)
+
+    # Añadir procesos para Prioridad
+    p7 = Process(id=7, arrival_time=0, burst_time=5, priority=2)
+    p8 = Process(id=8, arrival_time=1, burst_time=3, priority=1)
+    p9 = Process(id=9, arrival_time=2, burst_time=4, priority=3)
+
+    pq.add_process(p7)
+    pq.add_process(p8)
+    pq.add_process(p9)
+    avg_turnaround_priority, avg_waiting_priority = pq.execute_priority()
+
+    # Crear gráficos
+    algorithms = ['FIFO', 'SJF', 'Round Robin', 'Prioridad']
+    avg_turnaround = [avg_turnaround_fifo, avg_turnaround_sjf, avg_turnaround_rr, avg_turnaround_priority]
+    avg_waiting = [avg_waiting_fifo, avg_waiting_sjf, avg_waiting_rr, avg_waiting_priority]
+
+    plt.figure(figsize=(10, 5))
+
+    plt.subplot(1, 2, 1)
+    plt.bar(algorithms, avg_turnaround, color='blue')
+    plt.title('Promedio de Turnaround Time')
+    plt.xlabel('Algoritmo')
+    plt.ylabel('Turnaround Time Promedio')
+
+    plt.subplot(1, 2, 2)
+    plt.bar(algorithms, avg_waiting, color='green')
+    plt.title('Promedio de Waiting Time')
+    plt.xlabel('Algoritmo')
+    plt.ylabel('Waiting Time Promedio')
+
+    plt.tight_layout()
+    plt.show()
