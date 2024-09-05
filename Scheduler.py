@@ -22,7 +22,12 @@ class Scheduler:
             self.ready_queue.remove(shortest)
             return shortest
         elif self.algorithm == 'Round Robin':
-            return self.ready_queue.popleft() if self.ready_queue else None
+            if self.ready_queue:
+                process = self.ready_queue.popleft()
+                if process.remaining_time > self.time_quantum:
+                    self.ready_queue.append(process)  # Re-insertarlo si no ha terminado
+                return process
+            return None
         elif self.algorithm == 'Prioridad':
             if not self.ready_queue:
                 return None
