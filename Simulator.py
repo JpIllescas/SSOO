@@ -10,7 +10,7 @@ class Simulator:
         self.algorithms = algorithms
         self.time_quantum = time_quantum
         self.event_queue = EventQueue()
-        self.metrics = {algo: {'turnaround': [], 'waiting': [], 'response': []} for algo in algorithms}  # Añadir response time
+        self.metrics = {algo: {'turnaround': [], 'waiting': [], 'response': []} for algo in algorithms}
         self.cpu_idle_time = 0  # Para rastrear el tiempo de inactividad de la CPU
 
     def run(self, selected_algorithm):
@@ -24,61 +24,65 @@ class Simulator:
         # Reiniciar procesos
         for process in self.processes:
             process.remaining_time = process.burst_time
-            process.state = 'ready'
+            process.state = 'listo'  # Cambiar estado a 'listo' cuando el proceso esté listo para ejecutarse
             process.start_time = None
             process.finish_time = None
-            process.response_time = None  # Inicializamos el tiempo de respuesta
+            process.response_time = None
             arrival_event = Event(process.arrival_time, 'arrival', process)
             event_queue.add_event(arrival_event)
 
-        # Simulación
         while not event_queue.is_empty() or scheduler.has_processes():
             event = event_queue.get_next_event() if not event_queue.is_empty() else None
             if event and (scheduler.has_processes() == False or event.time <= current_time):
                 current_time = event.time
                 if event.event_type == 'arrival':
                     scheduler.add_process(event.process)
-                    print(f"Proceso {event.process.id} llegó en el tiempo {event.time}")
+                    print(f"Proceso {event.process.id} llegó en el tiempo {event.time} y está en estado {event.process.state}")
             else:
                 process = scheduler.get_next_process()
                 if process:
+                    if process.state == 'listo':
+                        # Simulación de falta de recursos
+                        if not self.check_resources(process):
+                            process.state = 'bloqueado'
+                            print(f"Proceso {process.id} está bloqueado por falta de recursos en el tiempo {current_time}")
+                            continue  # Si está bloqueado, no lo ejecutamos
+                        else:
+                            process.state = 'ejecución'  # Cambiar el estado a 'ejecución'
+
                     if process.start_time is None:
                         process.start_time = current_time
-                        process.response_time = current_time - process.arrival_time  # Calculamos el tiempo de respuesta
+                        process.response_time = current_time - process.arrival_time
                         metrics['response'].append(process.response_time)
+
                     exec_time = self.time_quantum if selected_algorithm == 'Round Robin' else process.burst_time
                     exec_time = min(exec_time, process.remaining_time)
                     current_time += exec_time
                     process.remaining_time -= exec_time
+
                     if process.remaining_time == 0:
                         process.finish_time = current_time
+                        process.state = 'terminado'  # Cambiar el estado a 'terminado'
                         turnaround = process.finish_time - process.arrival_time
                         waiting = turnaround - process.burst_time
                         metrics['turnaround'].append(turnaround)
                         metrics['waiting'].append(waiting)
-                        print(f"Proceso {process.id} completado en el tiempo {current_time}")
+                        print(f"Proceso {process.id} ha terminado en el tiempo {current_time} y está en estado {process.state}")
                     else:
                         scheduler.add_process(process)
                         print(f"Proceso {process.id} ejecutado por {exec_time} unidades de tiempo; tiempo restante {process.remaining_time}")
                 else:
-                    # CPU idle, no hay procesos listos
+                    # CPU ociosa
                     idle_time = event.time - current_time if event else 1
                     cpu_idle += idle_time
                     current_time += idle_time
                     print(f"CPU ociosa durante {idle_time} unidades de tiempo")
 
-        # Calcular promedios
-        avg_turnaround = sum(metrics['turnaround']) / len(metrics['turnaround']) if metrics['turnaround'] else 0
-        avg_waiting = sum(metrics['waiting']) / len(metrics['waiting']) if metrics['waiting'] else 0
-        avg_response = sum(metrics['response']) / len(metrics['response']) if metrics['response'] else 0
-        self.metrics[selected_algorithm]['turnaround'].append(avg_turnaround)
-        self.metrics[selected_algorithm]['waiting'].append(avg_waiting)
-        self.metrics[selected_algorithm]['response'].append(avg_response)
-        self.cpu_idle_time = cpu_idle
-        print(f"Promedio Turnaround Time para {selected_algorithm}: {avg_turnaround}")
-        print(f"Promedio Waiting Time para {selected_algorithm}: {avg_waiting}")
-        print(f"Promedio Response Time para {selected_algorithm}: {avg_response}")
-        print(f"Tiempo total de inactividad de la CPU: {cpu_idle}")
+    # Método para simular recursos disponibles
+    def check_resources(self, process):
+        # Simulación sencilla de si hay recursos disponibles para ejecutar el proceso
+        import random
+        return random.choice([True, False])  # Simulación de recursos disponibles o no
 
     def visualize(self):
         algorithms = self.algorithms

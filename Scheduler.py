@@ -24,8 +24,8 @@ class Scheduler:
         elif self.algorithm == 'Round Robin':
             if self.ready_queue:
                 process = self.ready_queue.popleft()
-                if process.remaining_time > self.time_quantum:
-                    self.ready_queue.append(process)  # Re-insertarlo si no ha terminado
+                if process.remaining_time > 0:
+                    self.add_process(process)  # Solo usa una llamada para re-insertar
                 return process
             return None
         elif self.algorithm == 'Prioridad':
