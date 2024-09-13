@@ -3,6 +3,7 @@ from Event import Event
 from EventQueue import EventQueue
 from Scheduler import Scheduler
 import matplotlib.pyplot as plt
+import psutil
 
 class Simulator:
     def __init__(self, processes, algorithms, time_quantum=2):
@@ -21,10 +22,9 @@ class Simulator:
         metrics = {'turnaround': [], 'waiting': [], 'response': []}
         cpu_idle = 0
 
-        # Reiniciar procesos
         for process in self.processes:
             process.remaining_time = process.burst_time
-            process.state = 'listo'  # Cambiar estado a 'listo' cuando el proceso esté listo para ejecutarse
+            process.state = 'listo'
             process.start_time = None
             process.finish_time = None
             process.response_time = None
@@ -37,24 +37,16 @@ class Simulator:
                 current_time = event.time
                 if event.event_type == 'arrival':
                     scheduler.add_process(event.process)
-                    print(f"Proceso {event.process.id} llegó en el tiempo {event.time} y está en estado {event.process.state}")
+                    print(f"Proceso {event.process.id} llegó en el tiempo {event.time}")
             else:
                 process = scheduler.get_next_process()
                 if process:
-                    if process.state == 'listo':
-                        # Simulación de falta de recursos
-                        if not self.check_resources(process):
-                            process.state = 'bloqueado'
-                            print(f"Proceso {process.id} está bloqueado por falta de recursos en el tiempo {current_time}")
-                            continue  # Si está bloqueado, no lo ejecutamos
-                        else:
-                            process.state = 'ejecución'  # Cambiar el estado a 'ejecución'
-
                     if process.start_time is None:
                         process.start_time = current_time
                         process.response_time = current_time - process.arrival_time
                         metrics['response'].append(process.response_time)
 
+                    # Definir `exec_time` aquí, según el algoritmo Round Robin o burst_time
                     exec_time = self.time_quantum if selected_algorithm == 'Round Robin' else process.burst_time
                     exec_time = min(exec_time, process.remaining_time)
                     current_time += exec_time
@@ -62,33 +54,40 @@ class Simulator:
 
                     if process.remaining_time == 0:
                         process.finish_time = current_time
-                        process.state = 'terminado'  # Cambiar el estado a 'terminado'
+                        process.state = 'terminado'
                         turnaround = process.finish_time - process.arrival_time
                         waiting = turnaround - process.burst_time
                         metrics['turnaround'].append(turnaround)
                         metrics['waiting'].append(waiting)
-                        print(f"Proceso {process.id} ha terminado en el tiempo {current_time} y está en estado {process.state}")
+                        print(f"Proceso {process.id} ha terminado en el tiempo {current_time}")
                     else:
                         scheduler.add_process(process)
                         print(f"Proceso {process.id} ejecutado por {exec_time} unidades de tiempo; tiempo restante {process.remaining_time}")
-                else:
-                    # CPU ociosa
-                    idle_time = event.time - current_time if event else 1
-                    cpu_idle += idle_time
-                    current_time += idle_time
-                    print(f"CPU ociosa durante {idle_time} unidades de tiempo")
 
-    # Método para simular recursos disponibles
-    def check_resources(self, process):
-        # Simulación sencilla de si hay recursos disponibles para ejecutar el proceso
-        import random
-        return random.choice([True, False])  # Simulación de recursos disponibles o no
+    # Método modificado para simular bloqueos basados en recursos reales
+    def check_resources(self, process, rendimiento='medio'):
+        # Obtener el uso de CPU y memoria
+        cpu_usage = psutil.cpu_percent()
+        memory_info = psutil.virtual_memory()
+
+        # Umbrales según el nivel de rendimiento
+        if rendimiento == 'alto':
+            cpu_threshold, memory_threshold = 90, 95
+        elif rendimiento == 'bajo':
+            cpu_threshold, memory_threshold = 70, 80
+        else:  # rendimiento medio
+            cpu_threshold, memory_threshold = 80, 90
+
+        if cpu_usage > cpu_threshold or memory_info.percent > memory_threshold:
+            print(f"Proceso {process.id} bloqueado: CPU {cpu_usage}%, Memoria {memory_info.percent}%")
+            return False  # Proceso bloqueado
+        return True  # Proceso tiene suficientes recursos
 
     def visualize(self):
         algorithms = self.algorithms
-        avg_turnaround = [self.metrics[algo]['turnaround'][0] if self.metrics[algo]['turnaround'] else 0 for algo in algorithms]
-        avg_waiting = [self.metrics[algo]['waiting'][0] if self.metrics[algo]['waiting'] else 0 for algo in algorithms]
-        avg_response = [self.metrics[algo]['response'][0] if self.metrics[algo]['response'] else 0 for algo in algorithms]
+        avg_turnaround = [sum(self.metrics[algo]['turnaround']) / len(self.metrics[algo]['turnaround']) if self.metrics[algo]['turnaround'] else 0 for algo in algorithms]
+        avg_waiting = [sum(self.metrics[algo]['waiting']) / len(self.metrics[algo]['waiting']) if self.metrics[algo]['waiting'] else 0 for algo in algorithms]
+        avg_response = [sum(self.metrics[algo]['response']) / len(self.metrics[algo]['response']) if self.metrics[algo]['response'] else 0 for algo in algorithms]
 
         plt.figure(figsize=(18, 6))
 
