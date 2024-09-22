@@ -2,7 +2,7 @@
 class Event:
     def __init__(self, time, event_type, process):
         self.time = time
-        self.event_type = event_type  # 'arrival' o 'completion'
+        self.event_type = event_type  # 'arrival', 'completion', 'block', 'unblock'
         self.process = process
 
     def __lt__(self, other):

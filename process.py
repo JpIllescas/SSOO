@@ -6,11 +6,11 @@ class Process:
         self.burst_time = burst_time
         self.priority = priority
         self.remaining_time = burst_time
-        self.state = 'nuevo'  # Estado inicial del proceso es 'nuevo'
+        self.state = 'nuevo'
         self.start_time = None
         self.finish_time = None
         self.response_time = None
-        self.blocked = False  # Atributo para indicar si el proceso está bloqueado por falta de recursos
+        self.blocked = False
 
     def __repr__(self):
         return f'Process(id={self.id}, arrival_time={self.arrival_time}, burst_time={self.burst_time}, priority={self.priority}, state={self.state})'
