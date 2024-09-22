@@ -1,6 +1,7 @@
 # Ignorar archivos de compilación
 *.pyc
 __pycache__/
+**grafica/
 
 # Ignorar entornos virtuales
 venv/

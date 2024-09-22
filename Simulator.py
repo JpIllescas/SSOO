@@ -156,5 +156,13 @@ class Simulator:
         plt.xlabel('Algoritmo')
         plt.ylabel('CPU Utilization (%)')
 
+        # Ajustar el diseño para evitar solapamientos
         plt.tight_layout()
-        plt.show()
+
+        # Ruta donde se guardará la gráfica
+        ruta = "grafica/"
+        fig = plt.gcf()  # Obtener la figura actual
+        fig.canvas.draw()
+
+        # Guardar la gráfica en formato PNG
+        plt.savefig(f'{ruta}graficas.png', format='png')        
