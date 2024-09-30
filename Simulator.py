@@ -3,8 +3,11 @@ from Event import Event
 from EventQueue import EventQueue
 from Scheduler import Scheduler
 import matplotlib.pyplot as plt
+from fpdf import FPDF
 import psutil
 import time
+import os
+
 
 class Simulator:
     def __init__(self, processes, algorithms, time_quantum=2):
@@ -15,7 +18,7 @@ class Simulator:
         self.blocked_queue = []
         self.metrics = {algo: {'turnaround': [], 'waiting': [], 'response': [], 'throughput': [], 'cpu_utilization': []} for algo in algorithms}
         self.total_time = 0
-
+    
     def run(self, selected_algorithm):
         print(f"\nSimulando algoritmo: {selected_algorithm}")
         scheduler = Scheduler(selected_algorithm, self.time_quantum)
@@ -75,13 +78,13 @@ class Simulator:
                         metrics['waiting'].append(waiting)
                         print(f"Proceso {process.id} ha terminado en el tiempo {current_time}")
                     elif process.remaining_time > 0:
-                        # Solo reinsertar si tiene tiempo restante y es Round Robin
                         if selected_algorithm == 'Round Robin':
-                            scheduler.add_process(process)
+                            scheduler.add_process(process)  # Solo reinserta en Round Robin
                             print(f"Proceso {process.id} ejecutado por {exec_time} unidades de tiempo; tiempo restante {process.remaining_time}")
-                        else:
-                            # Evitar reinsertar para algoritmos que no son Round Robin
-                            print(f"Proceso {process.id} tiene tiempo restante, pero no se reinserta en {selected_algorithm}")
+
+        # Agrega aquí los prints para verificar los tiempos antes de guardar las métricas
+        print(f"Métricas Waiting Time para {selected_algorithm}: {metrics['waiting']}")
+        print(f"Métricas Response Time para {selected_algorithm}: {metrics['response']}")
 
         self.total_time = current_time
         throughput = process_count / self.total_time
@@ -91,10 +94,34 @@ class Simulator:
         self.metrics[selected_algorithm]['waiting'].extend(metrics['waiting'])
         self.metrics[selected_algorithm]['response'].extend(metrics['response'])
         self.metrics[selected_algorithm]['throughput'].append(throughput)
-        self.metrics[selected_algorithm]['cpu_utilization'].append(cpu_utilization)
+        self.metrics[selected_algorithm]['cpu_utilization'].append(cpu_utilization)   
+        
+    def generar_reporte(self, selected_algorithm):
+        print(f"\nReporte para {selected_algorithm}:")
+        print(f"Promedio Turnaround Time: {sum(self.metrics[selected_algorithm]['turnaround']) / len(self.metrics[selected_algorithm]['turnaround'])}")
+        print(f"Promedio Waiting Time: {sum(self.metrics[selected_algorithm]['waiting']) / len(self.metrics[selected_algorithm]['waiting'])}")
+        print(f"Promedio Response Time: {sum(self.metrics[selected_algorithm]['response']) / len(self.metrics[selected_algorithm]['response'])}")
+        print(f"Throughput: {sum(self.metrics[selected_algorithm]['throughput'])}")
+        print(f"CPU Utilization: {sum(self.metrics[selected_algorithm]['cpu_utilization'])}%")    
+        
+    def generar_reporte_pdf(self, selected_algorithm):
+        pdf = FPDF()
+        pdf.add_page()
+
+        pdf.set_font("Arial", size=12)
+        pdf.cell(200, 10, txt=f"Reporte para {selected_algorithm}", ln=True)
+        pdf.cell(200, 10, txt=f"Promedio Turnaround Time: {sum(self.metrics[selected_algorithm]['turnaround']) / len(self.metrics[selected_algorithm]['turnaround'])}", ln=True)
+        pdf.cell(200, 10, txt=f"Promedio Waiting Time: {sum(self.metrics[selected_algorithm]['waiting']) / len(self.metrics[selected_algorithm]['waiting'])}", ln=True)
+        pdf.cell(200, 10, txt=f"Promedio Response Time: {sum(self.metrics[selected_algorithm]['response']) / len(self.metrics[selected_algorithm]['response'])}", ln=True)
+        pdf.cell(200, 10, txt=f"Throughput: {sum(self.metrics[selected_algorithm]['throughput'])}", ln=True)
+        pdf.cell(200, 10, txt=f"CPU Utilization: {sum(self.metrics[selected_algorithm]['cpu_utilization'])}%", ln=True)
+
+        carpeta = "reportes/"
+        ruta_pdf = os.path.join(carpeta, f"reporte_{selected_algorithm}.pdf")
+        pdf.output(ruta_pdf)
+        print(f"PDF guardado en: {ruta_pdf}")
 
     def check_blocked_processes(self):
-        # Revisar procesos bloqueados y tratar de desbloquearlos
         for process in self.blocked_queue[:]:
             if self.check_resources(process):
                 process.state = 'listo'
@@ -102,20 +129,18 @@ class Simulator:
                 print(f"Proceso {process.id} ha sido desbloqueado y movido a 'listo'")
 
     def check_resources(self, process):
-        # Simulación basada en recursos reales (CPU y memoria)
         cpu_usage = psutil.cpu_percent(interval=1)
         memory_info = psutil.virtual_memory()
 
-        # Establecemos umbrales de recursos
         cpu_threshold = 80  # Bloquear si el uso de CPU está por encima del 80%
         memory_threshold = 90  # Bloquear si la memoria está por encima del 90%
 
         if cpu_usage > cpu_threshold or memory_info.percent > memory_threshold:
             print(f"Proceso {process.id} bloqueado: Uso de CPU = {cpu_usage}%, Memoria = {memory_info.percent}%")
-            return False  # Se bloquea el proceso si los recursos están por encima de los umbrales
+            return False
 
-        return True  # No se bloquea si hay suficientes recursos
-                
+        return True
+    
     def visualize(self):
         algorithms = self.algorithms
         avg_turnaround = [sum(self.metrics[algo]['turnaround']) / len(self.metrics[algo]['turnaround']) if self.metrics[algo]['turnaround'] else 0 for algo in algorithms]
@@ -156,13 +181,6 @@ class Simulator:
         plt.xlabel('Algoritmo')
         plt.ylabel('CPU Utilization (%)')
 
-        # Ajustar el diseño para evitar solapamientos
         plt.tight_layout()
-
-        # Ruta donde se guardará la gráfica
         ruta = "grafica/"
-        fig = plt.gcf()  # Obtener la figura actual
-        fig.canvas.draw()
-
-        # Guardar la gráfica en formato PNG
-        plt.savefig(f'{ruta}graficas.png', format='png')        
+        plt.savefig(f'{ruta}graficas.png', format='png')
