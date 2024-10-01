@@ -1,5 +1,4 @@
 from process import Process
-from Scheduler import Scheduler
 from Simulator import Simulator
 import random
 
