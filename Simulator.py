@@ -68,6 +68,8 @@ class Simulator:
                 exec_time = self.time_quantum if selected_algorithm == 'Round Robin' else process.remaining_time
                 exec_time = min(exec_time, process.remaining_time)
                 print(f"Ejecutando proceso {process.id} (estado: {process.state}) por {exec_time} unidades de tiempo...")
+
+                metrics['cpu_time'] += exec_time  # Incrementar el tiempo de CPU utilizado
                 time.sleep(exec_time)  # Simular la ejecución del proceso
                 current_time += exec_time
                 process.remaining_time -= exec_time
@@ -90,14 +92,14 @@ class Simulator:
         print(f"Métricas Response Time para {selected_algorithm}: {metrics['response']}")
 
         self.total_time = current_time
-        throughput = process_count / self.total_time
-        cpu_utilization = metrics['cpu_time'] / self.total_time * 100
+        throughput = process_count / self.total_time if self.total_time > 0 else 0
+        cpu_utilization = (metrics['cpu_time'] / self.total_time * 100) if self.total_time > 0 else 0  # Evitar división por cero
 
         self.metrics[selected_algorithm]['turnaround'].extend(metrics['turnaround'])
         self.metrics[selected_algorithm]['waiting'].extend(metrics['waiting'])
         self.metrics[selected_algorithm]['response'].extend(metrics['response'])
         self.metrics[selected_algorithm]['throughput'].append(throughput)
-        self.metrics[selected_algorithm]['cpu_utilization'].append(cpu_utilization)  
+        self.metrics[selected_algorithm]['cpu_utilization'].append(cpu_utilization)   
         
     def generar_reporte(self, selected_algorithm):
         print(f"\nReporte para {selected_algorithm}:")
@@ -108,21 +110,33 @@ class Simulator:
         print(f"CPU Utilization: {sum(self.metrics[selected_algorithm]['cpu_utilization'])}%")    
         
     def generar_reporte_pdf(self, selected_algorithm):
+        from fpdf import FPDF
+
         pdf = FPDF()
         pdf.add_page()
-
         pdf.set_font("Arial", size=12)
-        pdf.cell(200, 10, txt=f"Reporte para {selected_algorithm}", ln=True)
-        pdf.cell(200, 10, txt=f"Promedio Turnaround Time: {sum(self.metrics[selected_algorithm]['turnaround']) / len(self.metrics[selected_algorithm]['turnaround'])}", ln=True)
-        pdf.cell(200, 10, txt=f"Promedio Waiting Time: {sum(self.metrics[selected_algorithm]['waiting']) / len(self.metrics[selected_algorithm]['waiting'])}", ln=True)
-        pdf.cell(200, 10, txt=f"Promedio Response Time: {sum(self.metrics[selected_algorithm]['response']) / len(self.metrics[selected_algorithm]['response'])}", ln=True)
-        pdf.cell(200, 10, txt=f"Throughput: {sum(self.metrics[selected_algorithm]['throughput'])}", ln=True)
-        pdf.cell(200, 10, txt=f"CPU Utilization: {sum(self.metrics[selected_algorithm]['cpu_utilization'])}%", ln=True)
 
+        pdf.cell(200, 10, txt=f"Reporte de Simulación - Algoritmo {selected_algorithm}", ln=True)
+        
+        # Verificar que haya datos en turnaround y response antes de calcular el promedio
+        if len(self.metrics[selected_algorithm]['turnaround']) > 0:
+            promedio_turnaround = sum(self.metrics[selected_algorithm]['turnaround']) / len(self.metrics[selected_algorithm]['turnaround'])
+        else:
+            promedio_turnaround = 0  # Valor por defecto si no hay datos
+        if len(self.metrics[selected_algorithm]['response']) > 0:
+            promedio_response = sum(self.metrics[selected_algorithm]['response']) / len(self.metrics[selected_algorithm]['response'])
+        else:
+            promedio_response = 0  # Valor por defecto si no hay datos
+
+        # Añadir métricas al PDF
+        pdf.cell(200, 10, txt=f"Promedio Turnaround Time: {promedio_turnaround}", ln=True)
+        pdf.cell(200, 10, txt=f"Promedio Response Time: {promedio_response}", ln=True)
+
+        # Guardar el archivo PDF
         carpeta = "reportes/"
         ruta_pdf = os.path.join(carpeta, f"reporte_{selected_algorithm}.pdf")
         pdf.output(ruta_pdf)
-
+        
     def check_blocked_processes(self):
         for process in self.blocked_queue[:]:
             if self.check_resources(process):
@@ -142,6 +156,7 @@ class Simulator:
             return False
 
         return True
+    
     def visualize(self):
         algorithms = self.algorithms
         avg_turnaround = [sum(self.metrics[algo]['turnaround']) / len(self.metrics[algo]['turnaround']) if self.metrics[algo]['turnaround'] else 0 for algo in algorithms]
