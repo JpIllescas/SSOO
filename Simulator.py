@@ -1,5 +1,3 @@
-
-from collections import deque
 from Event import Event
 from EventQueue import EventQueue
 from Scheduler import Scheduler
@@ -26,9 +24,8 @@ class Simulator:
         current_time = 0
         metrics = {'turnaround': [], 'waiting': [], 'response': [], 'cpu_time': 0}
         process_count = len(self.processes)
-        cpu_idle_time = 0
 
-        # Estado inicial "nuevo"
+        # Inicializar eventos de llegada
         for process in self.processes:
             process.state = 'nuevo'  # El proceso comienza en estado "nuevo"
             process.remaining_time = process.burst_time
@@ -39,56 +36,55 @@ class Simulator:
             self.event_queue.add_event(arrival_event)
 
         while not self.event_queue.is_empty() or scheduler.has_processes() or self.blocked_queue:
-            event = self.event_queue.get_next_event() if not self.event_queue.is_empty() else None
-
-            self.check_blocked_processes()
-
-            if event and (scheduler.has_processes() == False or event.time <= current_time):
+            # Manejar eventos
+            if not self.event_queue.is_empty():
+                event = self.event_queue.get_next_event()
                 current_time = event.time
                 if event.event_type == 'arrival':
-                    # Estado "listo"
-                    event.process.state = 'listo'  # El proceso pasa a estado "listo"
+                    event.process.state = 'listo'  # Cambiar a estado "listo"
                     scheduler.add_process(event.process)
-                    print(f"Proceso {event.process.id} (estado: {event.process.state}) llegó en el tiempo {event.time}")
-                    time.sleep(1)  # Simular la llegada del proceso
-            else:
-                process = scheduler.get_next_process()
-                if process:
-                    if process.start_time is None:
-                        process.start_time = current_time
-                        process.response_time = current_time - process.arrival_time
-                        metrics['response'].append(process.response_time)
+                    print(f"Proceso {event.process.id} (estado: {event.process.state}) llegó en el tiempo {current_time}")
 
-                    # Si no hay suficientes recursos, estado "bloqueado"
-                    if not self.check_resources(process):
-                        process.state = 'bloqueado'  # Cambiar a "bloqueado"
-                        self.blocked_queue.append(process)
-                        print(f"Proceso {process.id} bloqueado por falta de recursos (estado: {process.state})")
-                        continue
+            # Verificar procesos bloqueados
+            self.check_blocked_processes()
 
-                    # Estado "ejecución"
-                    process.state = 'ejecución'  # Cambiar a "ejecución"
-                    exec_time = self.time_quantum if selected_algorithm == 'Round Robin' else process.burst_time
-                    exec_time = min(exec_time, process.remaining_time)
-                    print(f"Ejecutando proceso {process.id} (estado: {process.state}) por {exec_time} unidades de tiempo...")
-                    time.sleep(exec_time)  # Simular la ejecución del proceso
-                    current_time += exec_time
-                    metrics['cpu_time'] += exec_time
-                    process.remaining_time -= exec_time
+            # Ejecutar el siguiente proceso
+            process = scheduler.get_next_process()
+            if process:
+                if process.start_time is None:
+                    process.start_time = current_time
+                    process.response_time = current_time - process.arrival_time
+                    metrics['response'].append(process.response_time)
 
-                    # Estado "terminado"
-                    if process.remaining_time == 0:
-                        process.finish_time = current_time
-                        process.state = 'terminado'  # Cambiar a "terminado"
-                        turnaround = process.finish_time - process.arrival_time
-                        waiting = turnaround - process.burst_time
-                        metrics['turnaround'].append(turnaround)
-                        metrics['waiting'].append(waiting)
-                        print(f"Proceso {process.id} ha terminado en el tiempo {current_time} (estado: {process.state})")
-                    elif process.remaining_time > 0:
-                        if selected_algorithm == 'Round Robin':
-                            scheduler.add_process(process)  # Reinserta en Round Robin
-                            print(f"Proceso {process.id} ejecutado por {exec_time} unidades de tiempo; tiempo restante {process.remaining_time} (estado: {process.state})")
+                # Verifica si hay recursos disponibles
+                if not self.check_resources(process):
+                    process.state = 'bloqueado'  # Cambiar a "bloqueado"
+                    self.blocked_queue.append(process)
+                    print(f"Proceso {process.id} bloqueado por falta de recursos (estado: {process.state})")
+                    continue
+
+                # Estado "ejecución"
+                process.state = 'ejecución'  # Cambiar a "ejecución"
+                exec_time = self.time_quantum if selected_algorithm == 'Round Robin' else process.remaining_time
+                exec_time = min(exec_time, process.remaining_time)
+                print(f"Ejecutando proceso {process.id} (estado: {process.state}) por {exec_time} unidades de tiempo...")
+                time.sleep(exec_time)  # Simular la ejecución del proceso
+                current_time += exec_time
+                process.remaining_time -= exec_time
+
+                # Estado "terminado"
+                if process.remaining_time == 0:
+                    process.finish_time = current_time
+                    process.state = 'terminado'  # Cambiar a "terminado"
+                    turnaround = process.finish_time - process.arrival_time
+                    waiting = turnaround - process.burst_time
+                    metrics['turnaround'].append(turnaround)
+                    metrics['waiting'].append(waiting)
+                    print(f"Proceso {process.id} ha terminado en el tiempo {current_time} (estado: {process.state})")
+                elif process.remaining_time > 0:
+                    if selected_algorithm == 'Round Robin':
+                        scheduler.add_process(process)  # Reinserta en Round Robin
+                        print(f"Proceso {process.id} ejecutado por {exec_time} unidades de tiempo; tiempo restante {process.remaining_time} (estado: {process.state})")
 
         print(f"Métricas Waiting Time para {selected_algorithm}: {metrics['waiting']}")
         print(f"Métricas Response Time para {selected_algorithm}: {metrics['response']}")
@@ -146,7 +142,6 @@ class Simulator:
             return False
 
         return True
-    
     def visualize(self):
         algorithms = self.algorithms
         avg_turnaround = [sum(self.metrics[algo]['turnaround']) / len(self.metrics[algo]['turnaround']) if self.metrics[algo]['turnaround'] else 0 for algo in algorithms]
